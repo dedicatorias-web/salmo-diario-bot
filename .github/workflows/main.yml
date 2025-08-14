@@ -1,0 +1,40 @@
+# Nome do workflow
+name: Gerador Diário de Imagem do Salmo
+
+on:
+  # Permite rodar manualmente
+  workflow_dispatch:
+  # Agenda para rodar todo dia às 6h UTC (3h da manhã no horário de Brasília)
+  schedule:
+    - cron: '0 6 * * *'
+
+jobs:
+  build-and-upload:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      # Instala o pacote de idioma para a data funcionar em português
+      - name: Install language pack
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y language-pack-pt-base
+          sudo locale-gen pt_BR.UTF-8
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run image generation script
+        env:
+          # Passa os segredos para o script
+          CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
+          CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
+          CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET }}
+        # MUITO IMPORTANTE: troque 'gerador.py' pelo nome do seu arquivo, se for diferente
+        run: python gerador.py
