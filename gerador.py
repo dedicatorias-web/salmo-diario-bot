@@ -13,7 +13,6 @@ import cloudinary
 import cloudinary.uploader
 
 # --- CONFIGURAÇÕES DE DESIGN ---
-# (Pode ajustar se quiser)
 TEXT_FILL_COLOR = (255, 255, 255)
 TEXT_STROKE_COLOR = (0, 0, 0)
 STROKE_WIDTH = 2
@@ -25,7 +24,6 @@ LINE_SPACING_BODY = 15
 PARAGRAPH_SPACING = 35
 MARGIN = 80
 
-# ... (O restante do código é o mesmo até a configuração do Cloudinary)
 # --- Configuração do Logging ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -99,8 +97,8 @@ if __name__ == "__main__":
     try:
         locale.setlocale(locale.LC_TIME, 'pt_BR.UTF-8')
     except locale.Error:
-        logging.warning("Locale 'pt_BR.UTF-8' não disponível no sistema.")
-
+        logging.warning("Locale 'pt_BR.UTF-8' não disponível no sistema. A data pode aparecer em inglês.")
+    
     try:
         cloudinary.config(
           cloud_name = os.getenv('CLOUDINARY_CLOUD_NAME'),
@@ -115,27 +113,32 @@ if __name__ == "__main__":
     width, height = 1080, 1352
     logging.info("Carregando modelo de IA...")
     pipe = DiffusionPipeline.from_pretrained("stabilityai/stable-diffusion-xl-base-1.0", torch_dtype=torch.float16, use_safetensors=True, variant="fp16")
-    pipe.enable_model_cpu_offload()
+    
+    # A LINHA ABAIXO FOI REMOVIDA PARA EVITAR O ERRO
+    # pipe.enable_model_cpu_offload() 
+    
+    # Movemos o pipeline para a CPU manualmente, já que não há GPU no ambiente do GitHub Actions
+    pipe = pipe.to("cpu")
+    
     refrao_salmo, corpo_paragrafos = buscar_salmo_api()
 
     if refrao_salmo and corpo_paragrafos:
         prompt_visual = "A beautiful and serene landscape painting of lush green pastures next to calm, crystal-clear still waters. The sun is setting, casting a warm, golden light over the entire scene. Atmosphere is peaceful and deeply comforting. Style: detailed oil painting, soft brush strokes, inspired by the Hudson River School. No people, no animals."
         logging.info("Gerando a imagem de fundo...")
-        torch.cuda.empty_cache()
+        
         base_image = pipe(prompt=prompt_visual, width=width, height=height, num_inference_steps=25).images[0]
-
+        
         titulo = "Liturgia Diária - Salmo"
         data_hoje = datetime.now().strftime("%d de %B de %Y")
-
+        
         final_image = compose_final_image(base_image, titulo, data_hoje, refrao_salmo, corpo_paragrafos)
-
+        
         nome_arquivo_local = "salmo_do_dia.png"
         final_image.save(nome_arquivo_local)
         logging.info(f"Imagem temporária salva como '{nome_arquivo_local}'")
 
-        # Define um nome de arquivo fixo para cada dia, para poder ser encontrado pelo site
         public_id = f"salmos/salmo_{datetime.now().strftime('%Y_%m_%d')}"
-
+        
         url_da_imagem_na_nuvem = upload_to_cloudinary(nome_arquivo_local, public_id)
 
         if url_da_imagem_na_nuvem:
