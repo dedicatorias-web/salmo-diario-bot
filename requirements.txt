@@ -1,1 +1,7 @@
-
+torch
+diffusers
+transformers
+accelerate
+requests
+pillow
+cloudinary
