@@ -29,7 +29,6 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 # --- Funções ---
 def buscar_salmo_api():
-    # ... (sem alterações)
     URL = "https://liturgia.up.railway.app/"; logging.info("Buscando o salmo na API...")
     try:
         response = requests.get(URL, timeout=15); response.raise_for_status()
@@ -37,87 +36,3 @@ def buscar_salmo_api():
         if dados and 'refrao' in dados and 'texto' in dados:
             paragrafos = dados['texto'].split('\n')
             paragrafos_limpos = [p.strip() for p in paragrafos if p.strip()]
-            return dados['refrao'], paragrafos_limpos
-        return None, None
-    except Exception as e:
-        logging.error(f"Erro ao buscar salmo: {e}"); return None, None
-
-def compose_final_image(base_image, title, date_str, refrao, body_paragraphs):
-    logging.info("Iniciando composição de imagem com layout adaptativo...")
-    draw = ImageDraw.Draw(base_image)
-    
-    # Define o espaço vertical disponível para o texto
-    available_height = base_image.height - (2 * MARGIN)
-    
-    # Clona as configurações para poder modificá-las dinamicamente
-    font_size_body = FONT_SIZE_BODY_MAX
-    line_spacing = LINE_SPACING_BODY_MAX
-    paragraph_spacing = PARAGRAPH_SPACING_MAX
-
-    while font_size_body >= MIN_FONT_SIZE_BODY:
-        try:
-            font_title = ImageFont.truetype(FONT_FILE_UNIFIED, FONT_SIZE_TITLE_MAX)
-            font_date = ImageFont.truetype(FONT_FILE_UNIFIED, FONT_SIZE_DATE_MAX)
-            font_body = ImageFont.truetype(FONT_FILE_UNIFIED, font_size_body)
-        except IOError:
-            logging.error(f"Fonte '{FONT_FILE_UNIFIED}' não encontrada!"); return base_image
-
-        # --- Medição da Altura do Texto ---
-        y_cursor = 150
-        x_pos = MARGIN
-        text_area_width_pixels = base_image.width - (2 * MARGIN)
-        avg_char_width = font_body.getlength("a")
-        wrap_width_chars = int(text_area_width_pixels / avg_char_width) if avg_char_width > 0 else 30
-        
-        total_text_height = 0
-        
-        # Mede título e data
-        total_text_height += FONT_SIZE_TITLE_MAX + 10 + FONT_SIZE_DATE_MAX + 60
-        
-        # Mede refrão
-        refrao_wrapped = textwrap.fill(f" {refrao}", width=wrap_width_chars)
-        total_text_height += draw.multiline_textbbox((0,0), refrao_wrapped, font=font_body, spacing=line_spacing)[3] + paragraph_spacing
-
-        # Mede parágrafos
-        for paragraph in body_paragraphs:
-            para_wrapped = textwrap.fill(f" {paragraph}", width=wrap_width_chars)
-            total_text_height += draw.multiline_textbbox((0,0), para_wrapped, font=font_body, spacing=line_spacing)[3] + paragraph_spacing
-            
-        # --- Verificação e Ajuste ---
-        if total_text_height <= available_height:
-            logging.info(f"Layout calculado. Usando fonte tamanho {font_size_body}pt.")
-            break # O texto cabe, então saímos do loop
-        else:
-            # Se não couber, reduz os tamanhos e tenta novamente
-            font_size_body -= 2
-            line_spacing = int(line_spacing * 0.95)
-            paragraph_spacing = int(paragraph_spacing * 0.95)
-            logging.warning(f"Texto muito longo. Tentando com fonte menor: {font_size_body}pt")
-    else: # Se o loop terminar sem 'break'
-        logging.error(f"Mesmo com a fonte mínima ({MIN_FONT_SIZE_BODY}pt), o texto não coube na imagem.")
-
-    # --- Desenho Final com os tamanhos calculados ---
-    y_cursor = 150
-    def draw_text_block(text, font, spacing_after):
-        nonlocal y_cursor
-        wrapped_text = textwrap.fill(text, width=wrap_width_chars)
-        draw.multiline_text((x_pos, y_cursor), wrapped_text, font=font, fill=TEXT_FILL_COLOR, spacing=line_spacing, stroke_width=STROKE_WIDTH, stroke_fill=STROKE_COLOR)
-        block_height = draw.multiline_textbbox((0,0), wrapped_text, font=font, spacing=line_spacing)[3]
-        y_cursor += block_height + spacing_after
-
-    draw.text((x_pos, y_cursor), title, font=font_title, fill=TEXT_FILL_COLOR, stroke_width=STROKE_WIDTH, stroke_fill=STROKE_COLOR)
-    y_cursor += FONT_SIZE_TITLE_MAX + 10
-    draw.text((x_pos, y_cursor), date_str, font=font_date, fill=TEXT_FILL_COLOR, stroke_width=STROKE_WIDTH, stroke_fill=STROKE_COLOR)
-    y_cursor += FONT_SIZE_DATE_MAX + 60
-    draw_text_block(f" {refrao}", font_body, paragraph_spacing)
-    for paragraph in body_paragraphs:
-        draw_text_block(f" {paragraph}", font_body, paragraph_spacing)
-        
-    return base_image
-
-def upload_to_cloudinary(file_path, public_id):
-    # ... (sem alterações)
-    pass
-
-# --- Início do Processo Principal ---
-# ... (sem alterações, continua usando o modelo turbo e a versão de alta resolução para geração)
