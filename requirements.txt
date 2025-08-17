@@ -1,7 +1,7 @@
+requests
+pillow
+cloudinary
 torch
 diffusers
 transformers
 accelerate
-requests
-pillow
-cloudinary
