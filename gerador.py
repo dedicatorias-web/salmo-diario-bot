@@ -1,4 +1,4 @@
-# NOME DO FICHEIRO: gerador.py (Versão Final com API Google v2)
+# NOME DO FICHEIRO: gerador.py (Versão com correção da API Imagen)
 
 import requests
 import logging
@@ -16,7 +16,7 @@ import vertexai
 from vertexai.generative_models import GenerativeModel, Image
 
 # --- CONFIGURAÇÕES DE DESIGN ---
-# ... (as configurações de design permanecem as mesmas)
+# ... (sem alterações)
 TEXT_COLOR_HEADER = (255, 255, 255); TEXT_COLOR_BODY = (255, 255, 255)
 STROKE_COLOR = (0, 0, 0, 180); STROKE_WIDTH = 2; CARD_OPACITY = 190
 FONT_FILE_UNIFIED = "Cookie-Regular.ttf"
@@ -44,8 +44,7 @@ def buscar_salmo_api():
 def gerar_prompt_com_gemini(texto_do_salmo):
     logging.info("Enviando texto do Salmo para o Gemini para gerar um prompt estilo Caravaggio...")
     try:
-        # USA A NOVA CLASSE 'GenerativeModel'
-        model = GenerativeModel("gemini-2.0-flash")
+        model = GenerativeModel("gemini-1.5-flash-latest") # Usando a sua sugestão
         instrucao = (
             "Analisa o Salmo fornecido e identifica o seu tema central e a imagem visual mais poderosa. "
             "Cria um prompt em INGLÊS para uma IA de geração de imagem, descrevendo uma cena dramática e realista no estilo do pintor barroco Caravaggio, "
@@ -64,13 +63,15 @@ def gerar_prompt_com_gemini(texto_do_salmo):
 def gerar_imagem_com_google_ai(prompt):
     logging.info("Enviando prompt para a API do Google AI (Imagen)...")
     try:
-        # USA A NOVA CLASSE 'GenerativeModel' TAMBÉM PARA IMAGENS
-        model = GenerativeModel("imagen-3.0-generate-002") # Usa o modelo Imagen 3
+        model = GenerativeModel("imagen-3.0-generate-001")
         
+        # =============================================================
+        # CORREÇÃO AQUI: 'number_of_examples' foi substituído por 'candidate_count'
+        # =============================================================
         response = model.generate_content(
             prompt,
             generation_config={
-                "number_of_examples": 1,
+                "candidate_count": 1,
                 "aspect_ratio": "9:16"
             }
         )
@@ -138,12 +139,10 @@ if __name__ == "__main__":
         locale.setlocale(locale.LC_TIME, 'pt_BR.UTF-8')
     except locale.Error:
         logging.warning("Locale 'pt_BR.UTF-8' não disponível.")
-    
-    project_id = os.getenv('GCP_PROJECT_ID')
+    project_id = os.getenv('GCP_PROJECT_ID');
     if not project_id:
         logging.error("ERRO: ID do projeto Google (GCP_PROJECT_ID) não encontrado."); exit()
     vertexai.init(project=project_id, location="us-central1")
-    
     try:
         cloudinary.config(cloud_name=os.getenv('CLOUDINARY_CLOUD_NAME'), api_key=os.getenv('CLOUDINARY_API_KEY'), api_secret=os.getenv('CLOUDINARY_API_SECRET'))
         logging.info("Credenciais do Cloudinary configuradas.")
