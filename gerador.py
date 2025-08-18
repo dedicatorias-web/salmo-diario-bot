@@ -1,4 +1,4 @@
-# NOME DO FICHEIRO: gerador.py (Versão com Diagnóstico de Upload)
+# NOME DO FICHEIRO: gerador.py (Versão com Estilo Caravaggio Reforçado)
 
 import requests
 import logging
@@ -11,13 +11,15 @@ import cloudinary
 import cloudinary.uploader
 from io import BytesIO
 
+# Importa as bibliotecas do Google Cloud
 import vertexai
+from vertexai.preview.generative_models import GenerativeModel
 from vertexai.preview.vision_models import ImageGenerationModel
 
 # --- CONFIGURAÇÕES DE DESIGN ---
-# ... (as configurações permanecem as mesmas)
-TEXT_COLOR_HEADER = (0, 0, 0); TEXT_COLOR_BODY = (255, 255, 255)
-STROKE_COLOR = (80, 80, 80, 150); STROKE_WIDTH = 2; CARD_OPACITY = 160
+# Aumentamos a opacidade do cartão e escurecemos o stroke para combinar com o estilo Caravaggio
+TEXT_COLOR_HEADER = (255, 255, 255); TEXT_COLOR_BODY = (255, 255, 255)
+STROKE_COLOR = (0, 0, 0, 200); STROKE_WIDTH = 2; CARD_OPACITY = 190 # Mais opaco
 FONT_FILE_UNIFIED = "Cookie-Regular.ttf"
 FONT_SIZE_TITLE = 90; FONT_SIZE_SUBTITLE = 50; FONT_SIZE_DATE = 40
 FONT_SIZE_SALMO_HEADER = 55; FONT_SIZE_BODY = 45
@@ -34,24 +36,54 @@ def buscar_salmo_api():
         response = requests.get(URL, timeout=15); response.raise_for_status()
         dados = response.json(); salmo_dados = dados.get('salmo')
         if salmo_dados and 'refrao' in salmo_dados and 'texto' in salmo_dados:
-            paragrafos = salmo_dados['texto'].split('\n')
-            paragrafos_limpos = [p.strip() for p in paragrafos if p.strip()]
-            titulo_salmo = salmo_dados.get('titulo', 'Salmo') 
-            return titulo_salmo, salmo_dados['refrao'], paragrafos_limpos
-        return None, None, None
+            paragrafos = salmo_dados['texto'].split('\n'); paragrafos_limpos = [p.strip() for p in paragrafos if p.strip()]
+            titulo_salmo = salmo_dados.get('titulo', 'Salmo'); texto_completo = salmo_dados['texto']
+            return titulo_salmo, salmo_dados['refrao'], paragrafos_limpos, texto_completo
+        return None, None, None, None
     except Exception as e:
-        logging.error(f"Erro ao buscar salmo: {e}"); return None, None, None
+        logging.error(f"Erro ao buscar salmo: {e}"); return None, None, None, None
+
+# =================================================================
+# FUNÇÃO ATUALIZADA COM INSTRUÇÕES DETALHADAS DE ESTILO
+# =================================================================
+def gerar_prompt_com_gemini(texto_do_salmo):
+    """Usa o Gemini para analisar o Salmo e criar um prompt de imagem no estilo de Caravaggio."""
+    logging.info("Enviando texto do Salmo para o Gemini para gerar um prompt estilo Caravaggio...")
+    try:
+        model = GenerativeModel("gemini-1.0-pro")
+        
+        instrucao = (
+            "INSTRUÇÕES PARA A IA:\n"
+            "1. Analisa o Salmo fornecido e identifica o seu tema central e a imagem visual mais poderosa.\n"
+            "2. Cria um prompt em INGLÊS para uma IA de geração de imagem. O objetivo é criar uma obra de arte digital no estilo do pintor barroco Michelangelo Merisi da Caravaggio.\n"
+            "3. O prompt deve obrigatoriamente incluir os seguintes elementos estilísticos:\n"
+            "   - **Tenebrism and Chiaroscuro:** Descreve uma cena a emergir de um fundo muito escuro ou preto, iluminada por uma única fonte de luz forte e direcional, criando sombras profundas e dramáticas.\n"
+            "   - **Intense Realism:** Foca em texturas realistas e detalhes crus (rocha, terra, água, luz).\n"
+            "   - **Dramatic Moment:** Captura um momento de alta intensidade emocional ou espiritual, não uma cena passiva.\n"
+            "   - **Limited Palette:** Menciona o uso de tons terrosos, ocres, vermelhos profundos e a ausência de cores excessivamente brilhantes.\n"
+            "4. O prompt NÃO deve incluir figuras humanas ou anjos. Deve traduzir o tema do Salmo em uma cena simbólica ou de natureza (por exemplo, uma luz a rasgar a escuridão, uma rocha a ser atingida por um raio de sol, etc.).\n"
+            "5. O resultado final deve ser apenas o texto do prompt em inglês, nada mais.\n\n"
+            f"SALMO PARA ANÁLISE:\n{texto_do_salmo}"
+        )
+        
+        response = model.generate_content(instrucao)
+        prompt_gerado = response.text.strip().replace("*", "") # Remove quaisquer asteriscos de formatação
+        
+        logging.info(f"Prompt gerado pelo Gemini: {prompt_gerado}")
+        return prompt_gerado
+
+    except Exception as e:
+        logging.error(f"Erro ao gerar prompt com o Gemini: {e}")
+        return "An oil painting in the style of Caravaggio. A single, dramatic beam of divine light breaks through a dark, cloudy sky, illuminating a rugged, ancient rock. The scene uses intense chiaroscuro and tenebrism, with deep black shadows and a limited palette of earthy tones."
 
 def gerar_imagem_com_google_ai(prompt):
     # ... (sem alterações)
     logging.info("Enviando prompt para a API do Google AI (Imagen)...")
     try:
-        project_id = os.getenv('GCP_PROJECT_ID')
-        vertexai.init(project=project_id, location="us-central1")
         model = ImageGenerationModel.from_pretrained("imagegeneration@006")
         response = model.generate_images(
             prompt=prompt, number_of_images=1, aspect_ratio="9:16",
-            negative_prompt="texto, palavras, letras, feio, má qualidade, disforme, pessoas, animais"
+            negative_prompt="cartoon, anime, text, words, letters, ugly, poor quality, deformed, people, animals"
         )
         image_bytes = response.images[0]._image_bytes
         logging.info("Imagem recebida com sucesso do Google AI!")
@@ -99,59 +131,42 @@ def compose_final_image(base_image, title, subtitle, date_str, salmo_title, refr
         y_cursor += draw.multiline_textbbox((0,0), para_wrapped, font=font_body, spacing=LINE_SPACING_BODY)[3] + PARAGRAPH_SPACING
     return background
 
-# =============================================================
-# FUNÇÃO DE UPLOAD COM DIAGNÓSTICO DETALHADO
-# =============================================================
 def upload_to_cloudinary(file_path, public_id):
-    """Faz o upload de um ficheiro para o Cloudinary com logging detalhado."""
-    logging.info("--- INICIANDO UPLOAD PARA O CLOUDINARY ---")
-    logging.info(f"A enviar o ficheiro: {file_path}")
-    logging.info(f"Com o public_id: {public_id}")
+    # ... (sem alterações)
+    logging.info(f"A fazer o upload do ficheiro '{file_path}' para o Cloudinary...")
     try:
-        # O upload em si
         upload_result = cloudinary.uploader.upload(file_path, public_id=public_id, overwrite=True)
-        
-        # Vamos inspecionar a resposta completa do Cloudinary
-        logging.info(f"Resposta completa do Cloudinary: {upload_result}")
-        
         secure_url = upload_result.get('secure_url')
         if secure_url:
-            logging.info(f"Upload bem-sucedido! URL segura encontrada: {secure_url}")
-            return secure_url
-        else:
-            logging.error("FALHA NO UPLOAD: A resposta do Cloudinary não continha uma 'secure_url'.")
-            return None
-            
-    except Exception as e:
-        # Imprime o erro completo se algo falhar
-        logging.error("--- EXCEÇÃO DURANTE O UPLOAD PARA O CLOUDINARY ---")
-        logging.error(f"Tipo de Erro: {type(e).__name__}")
-        logging.error(f"Mensagem de Erro: {e}")
+            logging.info(f"Upload bem-sucedido! URL segura: {secure_url}"); return secure_url
         return None
-# ===============================================
+    except Exception as e:
+        logging.error(f"Erro durante o upload para o Cloudinary: {e}"); return None
 
 # --- Início do Processo Principal ---
 if __name__ == "__main__":
+    # ... (sem alterações)
     try:
         locale.setlocale(locale.LC_TIME, 'pt_BR.UTF-8')
     except locale.Error:
         logging.warning("Locale 'pt_BR.UTF-8' não disponível.")
+    project_id = os.getenv('GCP_PROJECT_ID');
+    if not project_id:
+        logging.error("ERRO: ID do projeto Google (GCP_PROJECT_ID) não encontrado."); exit()
+    vertexai.init(project=project_id, location="us-central1")
     try:
-        cloudinary.config(cloud_name = os.getenv('CLOUDINARY_CLOUD_NAME'), api_key = os.getenv('CLOUDINARY_API_KEY'), api_secret = os.getenv('CLOUDINARY_API_SECRET'))
+        cloudinary.config(cloud_name=os.getenv('CLOUDINARY_CLOUD_NAME'), api_key=os.getenv('CLOUDINARY_API_KEY'), api_secret=os.getenv('CLOUDINARY_API_SECRET'))
         logging.info("Credenciais do Cloudinary configuradas.")
     except Exception:
         logging.error("ERRO: Credenciais do Cloudinary não encontradas."); exit()
-
-    titulo_salmo, refrao_salmo, corpo_paragrafos = buscar_salmo_api()
-
-    if refrao_salmo and corpo_paragrafos:
-        prompt_visual = f"Uma pintura digital cinematográfica e serena que representa o conceito espiritual de '{refrao_salmo}'. A atmosfera deve ser pacífica e reconfortante, com iluminação suave e etérea, cores suaves. Estilo de arte detalhado e inspirador."
+    titulo_salmo, refrao_salmo, corpo_paragrafos, texto_completo_salmo = buscar_salmo_api()
+    if texto_completo_salmo:
+        prompt_visual = gerar_prompt_com_gemini(texto_completo_salmo)
         base_image = gerar_imagem_com_google_ai(prompt_visual)
         if base_image:
             titulo = "Liturgia Diária"; subtitulo = "Prova de Amor"; data_hoje = datetime.now().strftime("%d de %B de %Y")
             final_image = compose_final_image(base_image, titulo, subtitulo, data_hoje, titulo_salmo, refrao_salmo, corpo_paragrafos)
-            nome_arquivo_local = "salmo_do_dia.png"
-            final_image.save(nome_arquivo_local)
+            nome_arquivo_local = "salmo_do_dia.png"; final_image.save(nome_arquivo_local)
             logging.info(f"Imagem temporária guardada como '{nome_arquivo_local}'")
             public_id = f"salmos/salmo_{datetime.now().strftime('%Y_%m_%d')}"
             url_da_imagem_na_nuvem = upload_to_cloudinary(nome_arquivo_local, public_id)
