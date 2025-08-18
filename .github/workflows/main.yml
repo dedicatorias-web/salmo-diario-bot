@@ -1,49 +1,49 @@
-# Nome do nosso workflow de automação
+# Nome do workflow
 name: Gerador Diário de Imagem do Salmo
 
-# Gatilhos: Quando esta automação deve rodar?
 on:
-  # Permite que você rode manualmente pela aba "Actions"
   workflow_dispatch:
-  # Agenda a execução todos os dias às 6:00 da manhã (horário UTC, 3h no Brasil)
   schedule:
     - cron: '0 6 * * *'
 
-# Tarefas: O que a automação deve fazer?
 jobs:
   build-and-upload:
-    # Usa um ambiente virtual Ubuntu (Linux)
     runs-on: ubuntu-latest
+    
+    # Adiciona permissões para autenticar com o Google Cloud
+    permissions:
+      contents: 'read'
+      id-token: 'write'
 
     steps:
-      # 1. Baixa o código do seu repositório para o ambiente virtual
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Configura o ambiente Python
       - name: Set up Python 3.10
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
       
-      # 3. Instala o pacote de idioma português para a data funcionar
       - name: Install Portuguese language pack
         run: |
           sudo apt-get update
           sudo apt-get install -y language-pack-pt-base
           sudo locale-gen pt_BR.UTF-8
 
-      # 4. Instala todas as bibliotecas listadas no requirements.txt
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      # 5. Executa o nosso script Python principal
+      # NOVO PASSO DE AUTENTICAÇÃO COM GOOGLE CLOUD
+      - id: 'auth'
+        uses: 'google-github-actions/auth@v2'
+        with:
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
       - name: Run image generation script
         env:
-          # Passa TODOS os segredos para o script
+          # Passa os segredos do Cloudinary e do Google para o script
           CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
           CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
           CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET }}
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        # MUITO IMPORTANTE: troque 'gerador.py' abaixo se o seu arquivo tiver outro nome
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
         run: python gerador.py
