@@ -3,3 +3,4 @@ pillow
 cloudinary
 google-cloud-aiplatform
 protobuf
+google-cloud-texttospeech
