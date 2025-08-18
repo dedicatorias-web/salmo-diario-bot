@@ -1,4 +1,4 @@
-# NOME DO FICHEIRO: gerador.py (Versão Final com Narração Google Cloud)
+# NOME DO FICHEIRO: gerador.py (Versão com Tratamento de Erro no Prompt)
 
 import requests
 import logging
@@ -15,12 +15,10 @@ from io import BytesIO
 import vertexai
 from vertexai.preview.generative_models import GenerativeModel
 from vertexai.preview.vision_models import ImageGenerationModel
-from google.cloud import texttospeech # Biblioteca para narração
 
 # --- CONFIGURAÇÕES DE DESIGN ---
-# ... (as configurações de design permanecem as mesmas)
-TEXT_COLOR_HEADER = (0, 0, 0); TEXT_COLOR_BODY = (255, 255, 255)
-STROKE_COLOR = (80, 80, 80, 150); STROKE_WIDTH = 2; CARD_OPACITY = 160
+TEXT_COLOR_HEADER = (255, 255, 255); TEXT_COLOR_BODY = (255, 255, 255)
+STROKE_COLOR = (0, 0, 0, 180); STROKE_WIDTH = 2; CARD_OPACITY = 190
 FONT_FILE_UNIFIED = "Cookie-Regular.ttf"
 FONT_SIZE_TITLE = 90; FONT_SIZE_SUBTITLE = 50; FONT_SIZE_DATE = 40
 FONT_SIZE_SALMO_HEADER = 55; FONT_SIZE_BODY = 45
@@ -31,7 +29,6 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 # --- Funções ---
 def buscar_salmo_api():
-    # ... (sem alterações)
     URL = "https://liturgia.up.railway.app/"; logging.info("Buscando o salmo na API...")
     try:
         response = requests.get(URL, timeout=15); response.raise_for_status()
@@ -44,67 +41,88 @@ def buscar_salmo_api():
     except Exception as e:
         logging.error(f"Erro ao buscar salmo: {e}"); return None, None, None, None
 
-# =================================================================
-# NOVA FUNÇÃO PARA GERAR A NARRAÇÃO
-# =================================================================
-def gerar_narracao_com_google_ai(texto_para_narrar, nome_ficheiro_saida):
-    """Gera um ficheiro de áudio a partir do texto usando a API Google Cloud TTS."""
-    logging.info("A enviar texto para a API Google Cloud Text-to-Speech...")
-    try:
-        # Instancia um cliente
-        client = texttospeech.TextToSpeechClient()
-
-        # Define o input do texto
-        synthesis_input = texttospeech.SynthesisInput(text=texto_para_narrar)
-
-        # Configura a voz (pt-BR, WaveNet, Feminina)
-        voice = texttospeech.VoiceSelectionParams(
-            language_code="pt-BR",
-            name="pt-BR-Wavenet-B"
-        )
-
-        # Configura o tipo de áudio (MP3)
-        audio_config = texttospeech.AudioConfig(
-            audio_encoding=texttospeech.AudioEncoding.MP3
-        )
-
-        # Realiza o pedido de síntese de texto
-        response = client.synthesize_speech(
-            input=synthesis_input, voice=voice, audio_config=audio_config
-        )
-
-        # O conteúdo de áudio da resposta é binário
-        with open(nome_ficheiro_saida, "wb") as out:
-            out.write(response.audio_content)
-            logging.info(f'Narração gerada e guardada como "{nome_ficheiro_saida}"')
-        
-        return True
-    except Exception as e:
-        logging.error(f"Erro ao gerar narração com a API do Google: {e}")
-        return False
-
+# =============================================================
+# MUDANÇA NO TRATAMENTO DE ERRO
+# =============================================================
 def gerar_prompt_com_gemini(texto_do_salmo):
-    # ... (sem alterações)
-    pass # O código desta função está omitido para brevidade
+    """Usa o Gemini para analisar o Salmo e criar um prompt de imagem no estilo de Caravaggio."""
+    logging.info("Enviando texto do Salmo para o Gemini para gerar um prompt estilo Caravaggio...")
+    try:
+        model = GenerativeModel("gemini-1.0-pro")
+        instrucao = (
+            "Analisa o Salmo fornecido e identifica o seu tema central e a imagem visual mais poderosa. "
+            "Cria um prompt em INGLÊS para uma IA de geração de imagem, descrevendo uma cena dramática e realista no estilo do pintor barroco Caravaggio, "
+            "usando alto contraste entre luz e sombra (chiaroscuro) e emoções intensas. "
+            "O resultado final deve ser apenas o texto do prompt em inglês, nada mais.\n\n"
+            f"SALMO PARA ANÁLISE:\n{texto_do_salmo}"
+        )
+        response = model.generate_content(instrucao)
+        prompt_gerado = response.text.strip().replace("*", "")
+        logging.info(f"Prompt gerado pelo Gemini: {prompt_gerado}")
+        return prompt_gerado
+    except Exception as e:
+        logging.error(f"Erro ao gerar prompt com o Gemini: {e}")
+        # Em caso de erro, retorna None para abortar o processo
+        return None
 
 def gerar_imagem_com_google_ai(prompt):
-    # ... (sem alterações)
-    pass # O código desta função está omitido para brevidade
+    logging.info("Enviando prompt para a API do Google AI (Imagen)...")
+    try:
+        model = ImageGenerationModel.from_pretrained("imagegeneration@006")
+        response = model.generate_images(
+            prompt=prompt, number_of_images=1, aspect_ratio="9:16",
+            negative_prompt="texto, palavras, letras, feio, má qualidade, disforme"
+        )
+        image_bytes = response.images[0]._image_bytes
+        logging.info("Imagem recebida com sucesso do Google AI!")
+        return Image.open(BytesIO(image_bytes))
+    except Exception as e:
+        logging.error(f"Erro ao gerar imagem com a API do Google: {e}")
+        return None
 
 def compose_final_image(base_image, title, subtitle, date_str, salmo_title, refrao, body_paragraphs):
     # ... (sem alterações)
-    pass # O código desta função está omitido para brevidade
-
-def upload_to_cloudinary(file_path, public_id, resource_type="image"):
-    """Faz o upload de um ficheiro (imagem ou áudio) para o Cloudinary."""
-    logging.info(f"A fazer o upload do ficheiro '{file_path}' ({resource_type}) para o Cloudinary...")
+    logging.info("Compondo a imagem final com o novo design...")
+    background = base_image.filter(ImageFilter.GaussianBlur(radius=3))
+    draw = ImageDraw.Draw(background)
     try:
-        upload_result = cloudinary.uploader.upload(
-            file_path, 
-            public_id=public_id, 
-            overwrite=True, 
-            resource_type=resource_type
-        )
+        font_title = ImageFont.truetype(FONT_FILE_UNIFIED, FONT_SIZE_TITLE)
+        font_subtitle = ImageFont.truetype(FONT_FILE_UNIFIED, FONT_SIZE_SUBTITLE)
+        font_date = ImageFont.truetype(FONT_FILE_UNIFIED, FONT_SIZE_DATE)
+        font_salmo_header = ImageFont.truetype(FONT_FILE_UNIFIED, FONT_SIZE_SALMO_HEADER)
+        font_body = ImageFont.truetype(FONT_FILE_UNIFIED, FONT_SIZE_BODY)
+    except IOError:
+        logging.error(f"Fonte '{FONT_FILE_UNIFIED}' não encontrada!"); return base_image
+    y_cursor = 60
+    draw.text((background.width / 2 + 2, y_cursor + 2), title, font=font_title, fill=STROKE_COLOR, anchor="mt")
+    draw.text((background.width / 2, y_cursor), title, font=font_title, fill=TEXT_COLOR_HEADER, anchor="mt")
+    y_cursor += FONT_SIZE_TITLE
+    draw.text((background.width / 2 + 1, y_cursor + 1), subtitle, font=font_subtitle, fill=STROKE_COLOR, anchor="mt")
+    draw.text((background.width / 2, y_cursor), subtitle, font=font_subtitle, fill=TEXT_COLOR_HEADER, anchor="mt")
+    margin_right = 40
+    draw.text((background.width - margin_right, 60), date_str, font=font_date, fill=TEXT_COLOR_HEADER, anchor="ra")
+    card_height = int(background.height * 0.6); card_margin = 40
+    card_area = [(card_margin, background.height - card_height), (background.width - card_margin, background.height - card_margin)]
+    overlay = Image.new('RGBA', background.size, (0,0,0,0)); draw_overlay = ImageDraw.Draw(overlay)
+    draw_overlay.rounded_rectangle(card_area, fill=(0, 0, 0, CARD_OPACITY), radius=20)
+    background = Image.alpha_composite(background.convert('RGBA'), overlay).convert('RGB'); draw = ImageDraw.Draw(background)
+    y_cursor = background.height - card_height + 40; x_pos = card_margin + 40; text_area_width_pixels = background.width - (2 * (card_margin + 40))
+    avg_char_width = font_body.getlength("a"); wrap_width_chars = int(text_area_width_pixels / avg_char_width) if avg_char_width > 0 else 35
+    draw.text((x_pos, y_cursor), salmo_title, font=font_salmo_header, fill=TEXT_COLOR_BODY)
+    y_cursor += FONT_SIZE_SALMO_HEADER + PARAGRAPH_SPACING
+    refrao_wrapped = textwrap.fill(refrao, width=wrap_width_chars)
+    draw.multiline_text((x_pos, y_cursor), refrao_wrapped, font=font_body, fill=TEXT_COLOR_BODY, spacing=LINE_SPACING_BODY)
+    y_cursor += draw.multiline_textbbox((0,0), refrao_wrapped, font=font_body, spacing=LINE_SPACING_BODY)[3] + PARAGRAPH_SPACING
+    for paragraph in body_paragraphs:
+        para_wrapped = textwrap.fill(paragraph, width=wrap_width_chars)
+        draw.multiline_text((x_pos, y_cursor), para_wrapped, font=font_body, fill=TEXT_COLOR_BODY, spacing=LINE_SPACING_BODY)
+        y_cursor += draw.multiline_textbbox((0,0), para_wrapped, font=font_body, spacing=LINE_SPACING_BODY)[3] + PARAGRAPH_SPACING
+    return background
+
+def upload_to_cloudinary(file_path, public_id):
+    logging.info(f"A fazer o upload do ficheiro '{file_path}' para o Cloudinary...")
+    try:
+        upload_result = cloudinary.uploader.upload(file_path, public_id=public_id, overwrite=True)
         secure_url = upload_result.get('secure_url')
         if secure_url:
             logging.info(f"Upload bem-sucedido! URL segura: {secure_url}"); return secure_url
@@ -119,7 +137,7 @@ if __name__ == "__main__":
     except locale.Error:
         logging.warning("Locale 'pt_BR.UTF-8' não disponível.")
     
-    project_id = os.getenv('GCP_PROJECT_ID')
+    project_id = os.getenv('GCP_PROJECT_ID');
     if not project_id:
         logging.error("ERRO: ID do projeto Google (GCP_PROJECT_ID) não encontrado."); exit()
     vertexai.init(project=project_id, location="us-central1")
@@ -133,31 +151,28 @@ if __name__ == "__main__":
     titulo_salmo, refrao_salmo, corpo_paragrafos, texto_completo_salmo = buscar_salmo_api()
 
     if texto_completo_salmo:
-        # GERAÇÃO DA IMAGEM (como antes)
         prompt_visual = gerar_prompt_com_gemini(texto_completo_salmo)
-        base_image = gerar_imagem_com_google_ai(prompt_visual)
         
-        # GERAÇÃO DA NARRAÇÃO (novo passo)
-        nome_narracao_local = "narracao_do_dia.mp3"
-        narracao_sucesso = gerar_narracao_com_google_ai(texto_completo_salmo, nome_narracao_local)
-        
-        if base_image:
-            titulo = "Liturgia Diária"; subtitulo = "Prova de Amor"; data_hoje = datetime.now().strftime("%d de %B de %Y")
-            final_image = compose_final_image(base_image, titulo, subtitulo, data_hoje, titulo_salmo, refrao_salmo, corpo_paragrafos)
+        # =============================================================
+        # MUDANÇA NO TRATAMENTO DE ERRO
+        # =============================================================
+        if not prompt_visual:
+            logging.error("PROCESSO ABORTADO: Falha ao gerar o prompt visual com o Gemini. Verifique os logs de erro acima.")
+        else:
+            base_image = gerar_imagem_com_google_ai(prompt_visual)
             
-            nome_imagem_local = "salmo_do_dia.png"
-            final_image.save(nome_imagem_local)
-            
-            # FAZ UPLOAD DE AMBOS OS FICHEIROS
-            public_id_base = f"salmos/salmo_{datetime.now().strftime('%Y_%m_%d')}"
-            
-            url_imagem = upload_to_cloudinary(nome_imagem_local, public_id_base, resource_type="image")
-            
-            url_narracao = None
-            if narracao_sucesso:
-                url_narracao = upload_to_cloudinary(nome_narracao_local, public_id_base, resource_type="video") # Áudio é tratado como "video" no Cloudinary
-            
-            if url_imagem:
-                print(f"URL PÚBLICA DA IMAGEM: {url_imagem}")
-            if url_narracao:
-                print(f"URL PÚBLICA DA NARRAÇÃO: {url_narracao}")
+            if base_image:
+                titulo = "Liturgia Diária"; subtitulo = "Prova de Amor"; data_hoje = datetime.now().strftime("%d de %B de %Y")
+                final_image = compose_final_image(base_image, titulo, subtitulo, data_hoje, titulo_salmo, refrao_salmo, corpo_paragrafos)
+                nome_arquivo_local = "salmo_do_dia.png"; final_image.save(nome_arquivo_local)
+                logging.info(f"Imagem temporária guardada como '{nome_arquivo_local}'")
+                public_id = f"salmos/salmo_{datetime.now().strftime('%Y_%m_%d')}"
+                url_da_imagem_na_nuvem = upload_to_cloudinary(nome_arquivo_local, public_id)
+                if url_da_imagem_na_nuvem:
+                    print(f"URL PÚBLICA: {url_da_imagem_na_nuvem}")
+                else:
+                    print("Falha no upload.")
+            else:
+                logging.error("PROCESSO ABORTADO: Falha ao gerar a imagem de fundo com o Imagen.")
+    else:
+        logging.error("PROCESSO ABORTADO: Falha ao buscar o Salmo na API.")
