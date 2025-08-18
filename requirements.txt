@@ -1,7 +1,5 @@
 requests
 pillow
 cloudinary
-torch
-diffusers
-transformers
-accelerate
+google-cloud-aiplatform
+protobuf
