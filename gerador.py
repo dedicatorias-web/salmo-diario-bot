@@ -63,7 +63,7 @@ def gerar_prompt_com_gemini(texto_do_salmo):
             "   - **Intense Realism:** Foca em texturas realistas e detalhes crus (rocha, terra, água, luz).\n"
             "   - **Dramatic Moment:** Captura um momento de alta intensidade emocional ou espiritual, não uma cena passiva.\n"
             "   - **Limited Palette:** Menciona o uso de tons terrosos, ocres, vermelhos profundos e a ausência de cores excessivamente brilhantes.\n"
-            #"4. O prompt NÃO deve incluir figuras humanas ou anjos. Deve traduzir o tema do Salmo em uma cena simbólica ou de natureza (por exemplo, uma luz a rasgar a escuridão, uma rocha a ser atingida por um raio de sol, etc.).\n"
+            "4. O prompt pode deve incluir figuras humanas ou anjos. Deve traduzir o tema do Salmo.\n"
             "5. O resultado final deve ser apenas o texto do prompt em inglês, nada mais.\n\n"
             f"SALMO PARA ANÁLISE:\n{texto_do_salmo}"
         )
