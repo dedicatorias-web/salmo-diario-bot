@@ -45,7 +45,7 @@ def gerar_prompt_com_gemini(texto_do_salmo):
     logging.info("Enviando texto do Salmo para o Gemini para gerar um prompt estilo Caravaggio...")
     try:
         # USA A NOVA CLASSE 'GenerativeModel'
-        model = GenerativeModel("gemini-1.5-pro-preview-0514")
+        model = GenerativeModel("gemini-2.0-flash")
         instrucao = (
             "Analisa o Salmo fornecido e identifica o seu tema central e a imagem visual mais poderosa. "
             "Cria um prompt em INGLÊS para uma IA de geração de imagem, descrevendo uma cena dramática e realista no estilo do pintor barroco Caravaggio, "
