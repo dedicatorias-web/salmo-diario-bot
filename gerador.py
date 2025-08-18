@@ -1,4 +1,4 @@
-# NOME DO FICHEIRO: gerador.py (Versão com nome do modelo Gemini corrigido)
+# NOME DO FICHEIRO: gerador.py (Versão Final com API Google v2)
 
 import requests
 import logging
@@ -11,12 +11,12 @@ import cloudinary
 import cloudinary.uploader
 from io import BytesIO
 
-# Importa as bibliotecas do Google Cloud
+# Importa as bibliotecas ATUALIZADAS do Google Cloud
 import vertexai
-from vertexai.preview.generative_models import GenerativeModel
-from vertexai.preview.vision_models import ImageGenerationModel
+from vertexai.generative_models import GenerativeModel, Image
 
 # --- CONFIGURAÇÕES DE DESIGN ---
+# ... (as configurações de design permanecem as mesmas)
 TEXT_COLOR_HEADER = (255, 255, 255); TEXT_COLOR_BODY = (255, 255, 255)
 STROKE_COLOR = (0, 0, 0, 180); STROKE_WIDTH = 2; CARD_OPACITY = 190
 FONT_FILE_UNIFIED = "Cookie-Regular.ttf"
@@ -42,14 +42,10 @@ def buscar_salmo_api():
         logging.error(f"Erro ao buscar salmo: {e}"); return None, None, None, None
 
 def gerar_prompt_com_gemini(texto_do_salmo):
-    """Usa o Gemini para analisar o Salmo e criar um prompt de imagem no estilo de Caravaggio."""
     logging.info("Enviando texto do Salmo para o Gemini para gerar um prompt estilo Caravaggio...")
     try:
-        # =============================================================
-        # CORREÇÃO AQUI: Usando o nome do modelo com a versão estável
-        # =============================================================
-        model = GenerativeModel("gemini-1.0-pro-002")
-        
+        # USA A NOVA CLASSE 'GenerativeModel'
+        model = GenerativeModel("gemini-1.5-pro-preview-0514")
         instrucao = (
             "Analisa o Salmo fornecido e identifica o seu tema central e a imagem visual mais poderosa. "
             "Cria um prompt em INGLÊS para uma IA de geração de imagem, descrevendo uma cena dramática e realista no estilo do pintor barroco Caravaggio, "
@@ -68,12 +64,18 @@ def gerar_prompt_com_gemini(texto_do_salmo):
 def gerar_imagem_com_google_ai(prompt):
     logging.info("Enviando prompt para a API do Google AI (Imagen)...")
     try:
-        model = ImageGenerationModel.from_pretrained("imagegeneration@006")
-        response = model.generate_images(
-            prompt=prompt, number_of_images=1, aspect_ratio="9:16",
-            negative_prompt="texto, palavras, letras, feio, má qualidade, disforme"
+        # USA A NOVA CLASSE 'GenerativeModel' TAMBÉM PARA IMAGENS
+        model = GenerativeModel("imagen-3.0-generate-001") # Usa o modelo Imagen 3
+        
+        response = model.generate_content(
+            prompt,
+            generation_config={
+                "number_of_examples": 1,
+                "aspect_ratio": "9:16"
+            }
         )
-        image_bytes = response.images[0]._image_bytes
+        
+        image_bytes = response.candidates[0].content.parts[0].blob.data
         logging.info("Imagem recebida com sucesso do Google AI!")
         return Image.open(BytesIO(image_bytes))
     except Exception as e:
@@ -81,6 +83,7 @@ def gerar_imagem_com_google_ai(prompt):
         return None
 
 def compose_final_image(base_image, title, subtitle, date_str, salmo_title, refrao, body_paragraphs):
+    # ... (sem alterações)
     logging.info("Compondo a imagem final com o novo design...")
     background = base_image.filter(ImageFilter.GaussianBlur(radius=3))
     draw = ImageDraw.Draw(background)
@@ -135,10 +138,12 @@ if __name__ == "__main__":
         locale.setlocale(locale.LC_TIME, 'pt_BR.UTF-8')
     except locale.Error:
         logging.warning("Locale 'pt_BR.UTF-8' não disponível.")
-    project_id = os.getenv('GCP_PROJECT_ID');
+    
+    project_id = os.getenv('GCP_PROJECT_ID')
     if not project_id:
         logging.error("ERRO: ID do projeto Google (GCP_PROJECT_ID) não encontrado."); exit()
     vertexai.init(project=project_id, location="us-central1")
+    
     try:
         cloudinary.config(cloud_name=os.getenv('CLOUDINARY_CLOUD_NAME'), api_key=os.getenv('CLOUDINARY_API_KEY'), api_secret=os.getenv('CLOUDINARY_API_SECRET'))
         logging.info("Credenciais do Cloudinary configuradas.")
