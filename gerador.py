@@ -65,7 +65,7 @@ def gerar_imagem_com_google_ai(prompt):
     logging.info("Enviando prompt para a API do Google AI (Imagen)...")
     try:
         # USA A NOVA CLASSE 'GenerativeModel' TAMBÉM PARA IMAGENS
-        model = GenerativeModel("imagen-3.0-generate-001") # Usa o modelo Imagen 3
+        model = GenerativeModel("imagen-3.0-generate-002") # Usa o modelo Imagen 3
         
         response = model.generate_content(
             prompt,
