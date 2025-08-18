@@ -1,4 +1,4 @@
-# NOME DO FICHEIRO: gerador.py (Versão com Tratamento de Erro no Prompt)
+# NOME DO FICHEIRO: gerador.py (Versão com nome do modelo Gemini corrigido)
 
 import requests
 import logging
@@ -41,14 +41,15 @@ def buscar_salmo_api():
     except Exception as e:
         logging.error(f"Erro ao buscar salmo: {e}"); return None, None, None, None
 
-# =============================================================
-# MUDANÇA NO TRATAMENTO DE ERRO
-# =============================================================
 def gerar_prompt_com_gemini(texto_do_salmo):
     """Usa o Gemini para analisar o Salmo e criar um prompt de imagem no estilo de Caravaggio."""
     logging.info("Enviando texto do Salmo para o Gemini para gerar um prompt estilo Caravaggio...")
     try:
-        model = GenerativeModel("gemini-1.0-pro")
+        # =============================================================
+        # CORREÇÃO AQUI: Usando o nome do modelo com a versão estável
+        # =============================================================
+        model = GenerativeModel("gemini-1.0-pro-002")
+        
         instrucao = (
             "Analisa o Salmo fornecido e identifica o seu tema central e a imagem visual mais poderosa. "
             "Cria um prompt em INGLÊS para uma IA de geração de imagem, descrevendo uma cena dramática e realista no estilo do pintor barroco Caravaggio, "
@@ -62,7 +63,6 @@ def gerar_prompt_com_gemini(texto_do_salmo):
         return prompt_gerado
     except Exception as e:
         logging.error(f"Erro ao gerar prompt com o Gemini: {e}")
-        # Em caso de erro, retorna None para abortar o processo
         return None
 
 def gerar_imagem_com_google_ai(prompt):
@@ -81,7 +81,6 @@ def gerar_imagem_com_google_ai(prompt):
         return None
 
 def compose_final_image(base_image, title, subtitle, date_str, salmo_title, refrao, body_paragraphs):
-    # ... (sem alterações)
     logging.info("Compondo a imagem final com o novo design...")
     background = base_image.filter(ImageFilter.GaussianBlur(radius=3))
     draw = ImageDraw.Draw(background)
@@ -136,12 +135,10 @@ if __name__ == "__main__":
         locale.setlocale(locale.LC_TIME, 'pt_BR.UTF-8')
     except locale.Error:
         logging.warning("Locale 'pt_BR.UTF-8' não disponível.")
-    
     project_id = os.getenv('GCP_PROJECT_ID');
     if not project_id:
         logging.error("ERRO: ID do projeto Google (GCP_PROJECT_ID) não encontrado."); exit()
     vertexai.init(project=project_id, location="us-central1")
-    
     try:
         cloudinary.config(cloud_name=os.getenv('CLOUDINARY_CLOUD_NAME'), api_key=os.getenv('CLOUDINARY_API_KEY'), api_secret=os.getenv('CLOUDINARY_API_SECRET'))
         logging.info("Credenciais do Cloudinary configuradas.")
@@ -149,18 +146,12 @@ if __name__ == "__main__":
         logging.error("ERRO: Credenciais do Cloudinary não encontradas."); exit()
 
     titulo_salmo, refrao_salmo, corpo_paragrafos, texto_completo_salmo = buscar_salmo_api()
-
     if texto_completo_salmo:
         prompt_visual = gerar_prompt_com_gemini(texto_completo_salmo)
-        
-        # =============================================================
-        # MUDANÇA NO TRATAMENTO DE ERRO
-        # =============================================================
         if not prompt_visual:
-            logging.error("PROCESSO ABORTADO: Falha ao gerar o prompt visual com o Gemini. Verifique os logs de erro acima.")
+            logging.error("PROCESSO ABORTADO: Falha ao gerar o prompt visual com o Gemini.")
         else:
             base_image = gerar_imagem_com_google_ai(prompt_visual)
-            
             if base_image:
                 titulo = "Liturgia Diária"; subtitulo = "Prova de Amor"; data_hoje = datetime.now().strftime("%d de %B de %Y")
                 final_image = compose_final_image(base_image, titulo, subtitulo, data_hoje, titulo_salmo, refrao_salmo, corpo_paragrafos)
